@@ -1,139 +1,96 @@
-window.dom = {
-    create(string) {
-      const container = document.createElement("template");
-      container.innerHTML = string.trim();
-      return container.content.firstChild;
-    },
-    after(node, node2) {
-      node.parentNode.insertBefore(node2, node.nextSibling);
-    },
-    before(node, node2){
-      node.parentNode.insertBefore(node2, node);
-    },
-    append(parent, node){
-      parent.appendChild(node)
-    },
-    wrap(node, parent){
-      dom.before(node, parent)
-      dom.append(parent, node)
-    },
-    remove(node){
-      node.parentNode.removeChild(node)
-      return node
-    },
-    empty(node){
-      const array = []
-      let x = node.firstChild
-      while(x){
-        array.push(dom.remove(node.firstChild))
-        x = node.firstChild
-      }
-      return array
-    },
-    attr(node, name, value){ // 重载
-      if(arguments.length === 3){
-        node.setAttribute(name, value)
-      }else if(arguments.length === 2){
-        return node.getAttribute(name)
-      }
-    },
-    text(node, string){ // 适配
-      if(arguments.length ===2 ){
-        if('innerText' in node){
-          node.innerText = string 
-        }else{
-          node.textContent = string 
-        }
-      }else if(arguments.length === 1){
-        if('innerText' in node){
-          return node.innerText
-        }else{
-          return node.textContent
-        }
-      }
-    },
-    html(node, string){
-      if(arguments.length === 2){
-        node.innerHTML = string
-      }else if(arguments.length === 1){
-        return node.innerHTML 
-      }
-    },
-    style(node, name, value){
-      if(arguments.length===3){
-        // dom.style(div, 'color', 'red')
-        node.style[name] = value
-      }else if(arguments.length===2){
-        if(typeof name === 'string'){
-          // dom.style(div, 'color')
-          return node.style[name]
-        }else if(name instanceof Object){
-          // dom.style(div, {color: 'red'})
-          const object = name
-          for(let key in object){
-            node.style[key] = object[key]
-          }
-        }
-      }
-    },
-    class: {
-      add(node, className){
-        node.classList.add(className)
-      },
-      remove(node, className){
-        node.classList.remove(className)
-      },
-      has(node, className){
-        return node.classList.contains(className)
-      }
-    },
-    on(node, eventName, fn){
-      node.addEventListener(eventName, fn)
-    },
-    off(node, eventName, fn){
-      node.removeEventListener(eventName, fn)
-    },
-    find(selector, scope){
-      return (scope || document).querySelectorAll(selector)
-    },
-    parent(node){
-      return node.parentNode
-    },
-    children(node){
-      return node.children
-    },
-    siblings(node){
-      return Array.from(node.parentNode.children)
-      .filter(n=>n!==node)
-    },
-    next(node){
-      let x = node.nextSibling
-      while(x && x.nodeType === 3){
-        x = x.nextSibling
-      }
-      return x
-    },
-    previous(node){
-      let x = node.previousSibling
-      while(x && x.nodeType === 3){
-        x = x.previousSibling
-      }
-      return x
-    },
-    each(nodeList, fn){
-      for(let i=0;i<nodeList.length;i++){
-        fn.call(null, nodeList[i])
-      }
-    },
-    index(node){
-      const list = dom.children(node.parentNode)
-      let i
-      for(i=0;i<list.length;i++){
-        if(list[i] === node){
-          break
-        }
-      }
-      return i
+window.jQuery = function(selectorOrArrayOrTemplate){
+  let elements
+  if(typeof selectorOrArrayOrTemplate === 'string'){
+    if(selectorOrArrayOrTemplate[0] === '<'){
+      // 创建 div
+      elements=[createElement(selectorOrArrayOrTemplate)]
+    }else{
+      // 查找 div
+      elements = document.querySelectorAll(selectorOrArrayOrTemplate)
     }
-  };
-  
+  }else if(selectorOrArrayOrTemplate instanceof Array){
+    elements = selectorOrArrayOrTemplate
+  }
+
+  function createElement(string){
+    const container = document.createElement("template");
+    container.innerHTML = string.trim();
+    return container.content.firstChild;
+  }
+  // api 可以操作elements
+  return {
+    jquery: true,
+    elements: elements,
+    get(index){
+      return elements[index]
+    },
+    appendTo(node){
+      if(node instanceof Element){
+        this.each(el => node.appendChild(el)) // 遍历 elements，对每个 el 进行 node.appendChild 操作
+      }else if(node.jquery === true){
+        this.each(el => node.get(0).appendChild(el))  // 遍历 elements，对每个 el 进行 node.get(0).appendChild(el))  操作
+      }
+    },
+    append(children){
+      if(children instanceof Element){
+        this.get(0).appendChild(children)
+      }else if(children instanceof HTMLCollection){
+        for(let i =0;i<children.length;i++){
+          this.get(0).appendChild(children[i])
+        }
+      }else if(children.jquery === true){
+        children.each(node => this.get(0).appendChild(node))
+      }
+    },
+    find(selector){
+      let array = []
+      for(let i =0;i<elements.length;i++){
+        const elements2 = Array.from(elements[i].querySelectorAll(selector))
+        array = array.concat(elements2)
+      }
+      array.oldApi = this // this 就是 旧 api
+      return jQuery(array)
+    },
+    each(fn){
+      for(let i=0; i<elements.length;i++){
+        fn.call(null, elements[i], i)
+      }
+      return this
+    },
+    parent(){
+      const array = []
+      this.each((node)=>{
+        if(array.indexOf(node.parentNode) === -1){
+          array.push(node.parentNode)
+        }
+      })
+      return jQuery(array)
+    },
+    children(){
+      const array = []
+      this.each((node)=>{
+        // 上课的时候这段代码是复制的，复制错了，现已改正
+        array.push(...node.children)
+        
+      })
+      return jQuery(array)
+    },
+    print(){
+      console.log(elements)
+    },
+    // 闭包：函数访问外部的变量
+    addClass(className){
+      for(let i=0;i<elements.length;i++){
+        const element = elements[i]
+        element.classList.add(className)
+      }
+      return this
+    },
+    oldApi: selectorOrArrayOrTemplate.oldApi,
+    end(){
+      return this.oldApi  // this 就是新 api
+    },
+  }
+}
+
+window.$ = window.jQuery
